@@ -11,7 +11,6 @@ import (
 	"net/http"
 	"os"
 	"strings"
-	"sync"
 	"time"
 
 	"github.com/fatih/structs"
@@ -68,19 +67,21 @@ func main() {
 
 	createProjects(ctx, Workspaces)
 
-	var wg sync.WaitGroup
+	// var wg sync.WaitGroup
 
 	for _, v := range Workspaces {
 		for _, w := range v.Projects {
-			wg.Add(1)
-			go func(ctx context.Context, workspaceSlug string, projectID string) {
-				defer wg.Done()
-				createTasks(ctx, workspaceSlug, projectID)
-			}(ctx, v.Slug, w.ID)
+			createTasks(ctx, v.Slug, w.ID)
 		}
+		// wg.Add(1)
+		// 	go func(ctx context.Context, workspaceSlug string, projectID string) {
+		// 		// defer wg.Done()
+		// 		createTasks(ctx, workspaceSlug, projectID)
+		// 	}(ctx, v.Slug, w.ID)
+		// }
 	}
 
-	wg.Wait()
+	// wg.Wait()
 }
 
 func createWorkspaces(ctx context.Context) {
