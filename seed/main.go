@@ -323,7 +323,7 @@ func cont() {
 		`
 			SELECT p.id, w.slug, COUNT(i.id) AS count
 			FROM projects p
-			INNER JOIN issues i ON i.project_id = p.id
+			LEFT JOIN issues i ON i.project_id = p.id
 			inner join workspaces w on p.workspace_id = w.id
 			GROUP BY p.id, w.slug
 			HAVING COUNT(i.id) < 200;
@@ -343,7 +343,7 @@ func cont() {
 
 	for _, v := range projects {
 		fmt.Println(v)
-		for i := v.Count; i <= 200; i++ {
+		for i := v.Count; i < 200; i++ {
 			order := i + 1
 
 			req := RequestCreateTask{
