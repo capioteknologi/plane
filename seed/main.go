@@ -59,29 +59,31 @@ func main() {
 		Token:     respLogin.AccessToken,
 	}
 
-	createWorkspaces(ctx)
+	// createWorkspaces(ctx)
 
-	for _, v := range Workspaces {
-		createMembers(ctx, v.ID)
-	}
+	// for _, v := range Workspaces {
+	// 	createMembers(ctx, v.ID)
+	// }
 
-	createProjects(ctx, Workspaces)
+	// createProjects(ctx, Workspaces)
 
 	// var wg sync.WaitGroup
 
-	for _, v := range Workspaces {
-		for _, w := range v.Projects {
-			createTasks(ctx, v.Slug, w.ID)
-		}
-		// wg.Add(1)
-		// 	go func(ctx context.Context, workspaceSlug string, projectID string) {
-		// 		// defer wg.Done()
-		// 		createTasks(ctx, workspaceSlug, projectID)
-		// 	}(ctx, v.Slug, w.ID)
-		// }
-	}
+	// for _, v := range Workspaces {
+	// 	for _, w := range v.Projects {
+	// 		createTasks(ctx, v.Slug, w.ID)
+	// 	}
+	// 	// wg.Add(1)
+	// 	// 	go func(ctx context.Context, workspaceSlug string, projectID string) {
+	// 	// 		// defer wg.Done()
+	// 	// 		createTasks(ctx, workspaceSlug, projectID)
+	// 	// 	}(ctx, v.Slug, w.ID)
+	// 	// }
+	// }
 
 	// wg.Wait()
+
+	cont()
 }
 
 func createWorkspaces(ctx context.Context) {
@@ -299,4 +301,87 @@ func doRequest(ctx context.Context, method string, endpoint string, contentType 
 	}
 
 	return respByte, resp.StatusCode, err
+}
+
+func cont() {
+	dbURL := fmt.Sprintf("postgres://%v:%v@%v:%v/%v?sslmode=disable", os.Getenv("DB_USER"), os.Getenv("DB_PASS"), os.Getenv("DB_HOST"), os.Getenv("DB_PORT"), os.Getenv("DB_NAME"))
+
+	db, err := sql.Open("postgres", dbURL)
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer db.Close()
+
+	type Project struct {
+		ID    string `json:"id"`
+		Slug  string `json:"slug"`
+		Count int    `json:"count"`
+	}
+	projects := make([]Project, 0)
+
+	rows, err := db.Query(
+		`
+			SELECT p.id, w.slug, COUNT(i.id) AS count
+			FROM projects p
+			INNER JOIN issues i ON i.project_id = p.id
+			inner join workspaces w on p.workspace_id = w.id
+			GROUP BY p.id, w.slug
+			HAVING COUNT(i.id) < 200;
+		`)
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer rows.Close()
+	for rows.Next() {
+		project := Project{}
+		if err := rows.Scan(&project.ID, &project.Slug, &project.Count); err != nil {
+			log.Fatal(err)
+		}
+		projects = append(projects, project)
+
+	}
+
+	for _, v := range projects {
+		fmt.Println(v)
+		for i := v.Count; i <= 200; i++ {
+			order := i + 1
+
+			req := RequestCreateTask{
+				Project: v.ID,
+				Name:    fmt.Sprintf("Test Task %v", order),
+				Description: Description{
+					Type: "doc",
+					Content: []Content{
+						{
+							Type: "paragraph",
+							Content: []Content2{
+								{
+									Type: "text",
+									Text: fmt.Sprintf("Test %v", order),
+								},
+							},
+						},
+					},
+				},
+
+				DescriptionHTML: fmt.Sprintf("<p>Test %v</p>", order),
+				EstimatePoint:   nil,
+				State:           "",
+				Parent:          nil,
+				Priority:        "none",
+				Assignees:       []any{},
+				AssigneesList:   []string{Admin.ID},
+				Labels:          []any{},
+				LabelsList:      []any{},
+				StartDate:       nil,
+				TargetDate:      nil,
+			}
+			respCreateTask, err := createTask(context.Background(), Admin, v.Slug, v.ID, req)
+			if err != nil {
+				panic(err)
+			}
+			fmt.Println(respCreateTask)
+		}
+	}
+
 }
